@@ -2115,6 +2115,7 @@ class RegisterAPI:
         Allocate the container with the given hotkey. <br>
         Generate ssh connection for given device requirements and timeline. <br>
         """
+        bt.logging.info("Debug - API: (register_api.py): !! _allocate_container_hotkey triggered.")
         device_requirement = {"cpu": {"count": 1}, "gpu": {
             "count": 1,
             "capacity": int(requirements.gpu_size) * 1000,
