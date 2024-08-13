@@ -504,7 +504,10 @@ class RegisterAPI:
             User use this API to book a specific miner. <br>
             hotkey: The miner hotkey to allocate the gpu resource. <br>
             """
+            bt.logging.info("Debug - API: (register_api.py): allocate_hotkey triggered.")
+
             if hotkey:
+                bt.logging.info(f"Debug - API: (register_api.py): Hotkey exist {hotkey}.")
                 # client_host = request.client.host
                 requirements = DeviceRequirement()
                 requirements.gpu_type = ""
@@ -514,8 +517,14 @@ class RegisterAPI:
                 # Generate UUID
                 uuid_key = str(uuid.uuid1())
 
+                bt.logging.info(f"Debug - API: (register_api.py): uuid_key exist {uuid_key}.")
+
                 private_key, public_key = rsa.generate_key_pair()
+                bt.logging.info(f"Debug - API: (register_api.py): private_key {private_key}, public_key {public_key}.")
+                bt.logging.info(f"Debug - API: (register_api.py): ssh_key {ssh_key}.")
+
                 if ssh_key:
+
                     if docker_requirement is None:
                         docker_requirement = DockerRequirement()
                         docker_requirement.ssh_key = ssh_key
@@ -523,8 +532,14 @@ class RegisterAPI:
                         docker_requirement.ssh_key = ssh_key
 
                 run_start = time.time()
+                bt.logging.info(f"Debug - API: (register_api.py): run_start {run_start}.")
+                bt.logging.info(f"Debug - API: (register_api.py): requirements {json.dumps(requirements)}.")
+
                 result = await run_in_threadpool(self._allocate_container_hotkey, requirements, hotkey,
                                                  requirements.timeline, public_key, docker_requirement.dict())
+
+                bt.logging.info(f"Debug - API: (register_api.py): result {json.dumps(result)}.")
+
                 if result["status"] is False:
                     bt.logging.error(f"API: Allocation {hotkey} Failed : {result['msg']}")
                     return JSONResponse(
@@ -2109,6 +2124,7 @@ class RegisterAPI:
         # Instantiate the connection to the db
         for axon in self.metagraph.axons:
             if axon.hotkey == hotkey:
+                bt.logging.info(f"Debug - API: (register_api.py): axon.hotkey === hotkey found. hotkey {hotkey}.")
                 check_allocation = self.dendrite.query(
                     axon,
                     Allocate(
@@ -2118,6 +2134,8 @@ class RegisterAPI:
                     ),
                     timeout=60,
                 )
+                bt.logging.info(f"Debug - API: (register_api.py): check_allocation {json.dumps(check_allocation)}.")
+
                 if check_allocation and check_allocation["status"] is True:
                     register_response = self.dendrite.query(
                         axon,
@@ -2130,10 +2148,16 @@ class RegisterAPI:
                         ),
                         timeout=100,
                     )
+                    bt.logging.info(f"Debug - API: (register_api.py): register_response {json.dumps(register_response)}.")
+
                     if register_response and register_response["status"] is True:
                         register_response["ip"] = axon.ip
                         register_response["hotkey"] = axon.hotkey
+                        bt.logging.info(f"Debug - API: (register_api.py): register_response: v2 {json.dumps(register_response)}.")
                         return register_response
+
+        bt.logging.info(f"Debug - API: (register_api.py): no axon found. hotkey {hotkey}.")
+                
 
         return {"status": False, "msg": "Requested resource is not available."}
 
