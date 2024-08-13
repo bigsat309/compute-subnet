@@ -533,7 +533,7 @@ class RegisterAPI:
 
                 run_start = time.time()
                 bt.logging.info(f"Debug - API: (register_api.py): run_start {run_start}.")
-                bt.logging.info(f"Debug - API: (register_api.py): requirements {json.dumps(requirements)}.")
+                # bt.logging.info(f"Debug - API: (register_api.py): requirements {json.dumps(requirements)}.")
 
                 result = await run_in_threadpool(self._allocate_container_hotkey, requirements, hotkey,
                                                  requirements.timeline, public_key, docker_requirement.dict())
@@ -2134,7 +2134,8 @@ class RegisterAPI:
                     ),
                     timeout=60,
                 )
-                bt.logging.info(f"Debug - API: (register_api.py): check_allocation {json.dumps(check_allocation)}.")
+                bt.logging.info(f"Debug - API: (register_api.py): check_allocation {check_allocation}.")
+                bt.logging.info(f"Debug - API: (register_api.py): check_allocation {str(check_allocation)}.")
 
                 if check_allocation and check_allocation["status"] is True:
                     register_response = self.dendrite.query(
