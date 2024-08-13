@@ -497,127 +497,132 @@ class RegisterAPI:
                 },
             },
         )
+
         async def allocate_hotkey(hotkey: str, ssh_key: Optional[str] = None,
-                                  docker_requirement: Optional[DockerRequirement] = None) -> JSONResponse:
-            """
-            The GPU allocate by hotkey API endpoint. <br>
-            User use this API to book a specific miner. <br>
-            hotkey: The miner hotkey to allocate the gpu resource. <br>
-            """
-            bt.logging.info("Debug - API: (register_api.py): allocate_hotkey triggered.")
+                                docker_requirement: Optional[DockerRequirement] = None) -> JSONResponse:
+            try:
+                bt.logging.info("Debug - API: (register_api.py): allocate_hotkey triggered.")
 
-            if hotkey:
-                bt.logging.info(f"Debug - API: (register_api.py): Hotkey exist {hotkey}.")
-                # client_host = request.client.host
-                requirements = DeviceRequirement()
-                requirements.gpu_type = ""
-                requirements.gpu_size = 0
-                requirements.timeline = 30
+                if hotkey:
+                    bt.logging.info(f"Debug - API: (register_api.py): Hotkey exists {hotkey}.")
+                    # client_host = request.client.host
+                    requirements = DeviceRequirement()
+                    requirements.gpu_type = ""
+                    requirements.gpu_size = 0
+                    requirements.timeline = 30
 
-                # Generate UUID
-                uuid_key = str(uuid.uuid1())
+                    # Generate UUID
+                    uuid_key = str(uuid.uuid1())
 
-                bt.logging.info(f"Debug - API: (register_api.py): uuid_key exist {uuid_key}.")
+                    bt.logging.info(f"Debug - API: (register_api.py): uuid_key exists {uuid_key}.")
 
-                private_key, public_key = rsa.generate_key_pair()
-                bt.logging.info(f"Debug - API: (register_api.py): private_key {private_key}, public_key {public_key}.")
-                bt.logging.info(f"Debug - API: (register_api.py): ssh_key {ssh_key}.")
+                    private_key, public_key = rsa.generate_key_pair()
+                    bt.logging.info(f"Debug - API: (register_api.py): private_key {private_key}, public_key {public_key}.")
+                    bt.logging.info(f"Debug - API: (register_api.py): ssh_key {ssh_key}.")
 
-                if ssh_key:
+                    if ssh_key:
+                        if docker_requirement is None:
+                            docker_requirement = DockerRequirement()
+                            docker_requirement.ssh_key = ssh_key
+                        else:
+                            docker_requirement.ssh_key = ssh_key
 
-                    if docker_requirement is None:
-                        docker_requirement = DockerRequirement()
-                        docker_requirement.ssh_key = ssh_key
-                    else:
-                        docker_requirement.ssh_key = ssh_key
+                    run_start = time.time()
+                    bt.logging.info(f"Debug - API: (register_api.py): run_start {run_start}.")
+                    # bt.logging.info(f"Debug - API: (register_api.py): requirements {json.dumps(requirements)}.")
 
-                run_start = time.time()
-                bt.logging.info(f"Debug - API: (register_api.py): run_start {run_start}.")
-                # bt.logging.info(f"Debug - API: (register_api.py): requirements {json.dumps(requirements)}.")
+                    result = await run_in_threadpool(self._allocate_container_hotkey, requirements, hotkey,
+                                                    requirements.timeline, public_key, docker_requirement.dict())
 
-                result = await run_in_threadpool(self._allocate_container_hotkey, requirements, hotkey,
-                                                 requirements.timeline, public_key, docker_requirement.dict())
+                    bt.logging.info(f"Debug - API: (register_api.py): result {json.dumps(result)}.")
 
-                bt.logging.info(f"Debug - API: (register_api.py): result {json.dumps(result)}.")
+                    if result["status"] is False:
+                        bt.logging.error(f"API: Allocation {hotkey} Failed : {result['msg']}")
+                        return JSONResponse(
+                            status_code=status.HTTP_404_NOT_FOUND,
+                            content={
+                                "success": False,
+                                "message": "Failed to allocate resource",
+                                "err_detail": result["msg"],
+                            },
+                        )
 
-                if result["status"] is False:
-                    bt.logging.error(f"API: Allocation {hotkey} Failed : {result['msg']}")
-                    return JSONResponse(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        content={
-                            "success": False,
-                            "message": "Fail to allocate resource",
-                            "err_detail": result["msg"],
-                        },
+                    run_end = time.time()
+                    time_eval = run_end - run_start
+
+                    db = ComputeDb()
+                    specs_details = await run_in_threadpool(get_miner_details, db)
+                    for key, details in specs_details.items():
+                        if str(key) == str(hotkey) and details:
+                            try:
+                                gpu_miner = details["gpu"]
+                                gpu_name = str(gpu_miner["details"][0]["name"]).lower()
+                                break
+                            except (KeyError, IndexError, TypeError):
+                                gpu_name = "Invalid details"
+                        else:
+                            gpu_name = "No details available"
+
+                    result_hotkey = result["hotkey"]
+                    result_info = result["info"]
+                    private_key = private_key.encode("utf-8")
+                    decrypted_info_str = rsa.decrypt_data(
+                        private_key, base64.b64decode(result_info)
                     )
 
-                run_end = time.time()
-                time_eval = run_end - run_start
-                # bt.logging.info(f"API: Create docker container in: {run_end - run_start:.2f} seconds")
+                    info = json.loads(decrypted_info_str)
+                    info["ip"] = result["ip"]
+                    info["resource"] = gpu_name
+                    info["regkey"] = public_key
+                    info["ssh_key"] = docker_requirement.ssh_key
+                    info["uuid"] = uuid_key
 
-                # Iterate through the miner specs details to get gpu_name
-                db = ComputeDb()
-                specs_details = await run_in_threadpool(get_miner_details, db)
-                for key, details in specs_details.items():
-                    if str(key) == str(hotkey) and details:
-                        try:
-                            gpu_miner = details["gpu"]
-                            gpu_name = str(gpu_miner["details"][0]["name"]).lower()
-                            break
-                        except (KeyError, IndexError, TypeError):
-                            gpu_name = "Invalid details"
-                    else:
-                        gpu_name = "No details available"
+                    await asyncio.sleep(1)
+                    allocated = Allocation()
+                    allocated.resource = info["resource"]
+                    allocated.hotkey = result_hotkey
+                    allocated.ssh_key = info["ssh_key"]
+                    allocated.ssh_ip = info["ip"]
+                    allocated.ssh_port = info["port"]
+                    allocated.ssh_username = info["username"]
+                    allocated.ssh_password = info["password"]
+                    allocated.uuid_key = info["uuid"]
+                    allocated.ssh_command = f"ssh {info['username']}@{result['ip']} -p {str(info['port'])}"
 
-                result_hotkey = result["hotkey"]
-                result_info = result["info"]
-                private_key = private_key.encode("utf-8")
-                decrypted_info_str = rsa.decrypt_data(
-                    private_key, base64.b64decode(result_info)
-                )
+                    update_allocation_db(result_hotkey, info, True)
+                    await self._update_allocation_wandb()
 
-                info = json.loads(decrypted_info_str)
-                info["ip"] = result["ip"]
-                info["resource"] = gpu_name
-                info["regkey"] = public_key
-                info["ssh_key"] = docker_requirement.ssh_key
-                info["uuid"] = uuid_key
-
-                await asyncio.sleep(1)
-                allocated = Allocation()
-                allocated.resource = info["resource"]
-                allocated.hotkey = result_hotkey
-                allocated.ssh_key = info["ssh_key"]
-                # allocated.regkey = info["regkey"]
-                allocated.ssh_ip = info["ip"]
-                allocated.ssh_port = info["port"]
-                allocated.ssh_username = info["username"]
-                allocated.ssh_password = info["password"]
-                allocated.uuid_key = info["uuid"]
-                allocated.ssh_command = f"ssh {info['username']}@{result['ip']} -p {str(info['port'])}"
-
-                update_allocation_db(result_hotkey, info, True)
-                await self._update_allocation_wandb()
-
-                bt.logging.info(f"API: Resource {allocated.hotkey} was successfully allocated")
+                    bt.logging.info(f"API: Resource {allocated.hotkey} was successfully allocated")
+                    return JSONResponse(
+                        status_code=status.HTTP_200_OK,
+                        content={
+                            "success": True,
+                            "message": "Resource was successfully allocated",
+                            "data": jsonable_encoder(allocated),
+                        },
+                    )
+                else:
+                    bt.logging.error(f"API: Invalid allocation request")
+                    return JSONResponse(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        content={
+                            "success": False,
+                            "message": "Invalid allocation request",
+                            "err_detail": "Invalid hotkey, please check the hotkey",
+                        },
+                    )
+            except Exception as e:
+                error_message = str(e)
+                bt.logging.error(f"API: Internal Server Error - {error_message}")
                 return JSONResponse(
-                    status_code=status.HTTP_200_OK,
-                    content={
-                        "success": True,
-                        "message": "Resource was successfully allocated",
-                        "data": jsonable_encoder(allocated),
-                    },
-                )
-            else:
-                bt.logging.error(f"API: Invalid allocation request")
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     content={
                         "success": False,
-                        "message": "Invalid allocation request",
-                        "err_detail": "Invalid hotkey, please check the hotkey",
+                        "message": "Internal Server Error",
+                        "error": error_message,
                     },
                 )
+
 
         @self.app.post(
             "/service/deallocate",
