@@ -287,7 +287,7 @@ class Miner:
                     self.axon.stop()
                     self.init_axon()
 
-    def base_blacklist(self, synapse: typing.Union[Specs, Allocate, Challenge]) -> typing.Tuple[bool, str]:
+    def base_blacklist(self, synapse: typing.Union[Specs, Allocate, Challenge, MinerPort]) -> typing.Tuple[bool, str]:
         hotkey = synapse.dendrite.hotkey
         synapse_type = type(synapse).__name__
 
@@ -326,7 +326,7 @@ class Miner:
         bt.logging.trace(f"Not Blacklisting recognized hotkey {synapse.dendrite.hotkey}")
         return False, "Hotkey recognized!"
 
-    def base_priority(self, synapse: typing.Union[Specs, Allocate, Challenge]) -> float:
+    def base_priority(self, synapse: typing.Union[Specs, Allocate, Challenge, MinerPort]) -> float:
         caller_uid = self._metagraph.hotkeys.index(synapse.dendrite.hotkey)  # Get the caller index.
         priority = float(self._metagraph.S[caller_uid])  # Return the stake as the priority.
         bt.logging.trace(f"Prioritizing {synapse.dendrite.hotkey} with value: ", priority)
@@ -440,12 +440,12 @@ class Miner:
         return synapse
     
     # The blacklist function decides if a request should be ignored.
-    def blacklist_miner_port(self, synapse: Challenge) -> typing.Tuple[bool, str]:
+    def blacklist_miner_port(self, synapse: MinerPort) -> typing.Tuple[bool, str]:
         return self.base_blacklist(synapse)
 
     # The priority function determines the order in which requests are handled.
     # More valuable or higher-priority requests are processed before others.
-    def priority_miner_port(self, synapse: Challenge) -> float:
+    def priority_miner_port(self, synapse: MinerPort) -> float:
         return self.base_priority(synapse)
     
     # This is the Minerport function, which sends the miner's port.
