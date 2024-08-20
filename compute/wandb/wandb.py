@@ -219,7 +219,7 @@ class ComputeWandb:
             }
         self.run.config.update(update_dict, allow_val_change=True)
 
-        # Track allocated hotkeys over time
+        # Track penalized hotkeys over time
         self.run.log({"penalized_hotkeys": self.run.config["penalized_hotkeys"]})
 
         # Sign the run
@@ -235,6 +235,9 @@ class ComputeWandb:
                 "is_port_open": is_port_open,
             }
             self.run.config.update(update_dict, allow_val_change=True)
+
+            # Track is_port_open
+            self.run.log({"is_port_open": self.run.config["is_port_open"]})
             
             # Sign the run
             self.sign_run()
