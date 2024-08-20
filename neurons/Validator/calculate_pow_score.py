@@ -35,7 +35,7 @@ def prevent_none(val):
 
 
 # Calculate score based on the performance information
-def calc_score(response, hotkey, allocated_hotkeys, mock=False):
+def calc_score(response, hotkey, allocated_hotkeys, penalized_hotkeys, mock=False):
     """
     Method to calculate the score attributed to this miner dual uid - hotkey
     :param response:
@@ -99,6 +99,9 @@ def calc_score(response, hotkey, allocated_hotkeys, mock=False):
         allocation_score = difficulty_modifier * allocation_weight
         allocation_status = hotkey in allocated_hotkeys
 
+        # Penalty for port closed
+        penalty_port_checking = hotkey in penalized_hotkeys
+
         # Calculate the score
         max_score_challenge = 100 * (success_weight + difficulty_weight + time_elapsed_weight)
         max_score_allocation = 100 * allocation_weight
@@ -114,6 +117,10 @@ def calc_score(response, hotkey, allocated_hotkeys, mock=False):
             final_score = difficulty + successes + time_elapsed - failed_penalty
             if penalty:
                 final_score = final_score/2
+
+        if penalty_port_checking:
+            # Add penalty logic for port closed
+            final_score = final_score / 2
 
         # Final score is > 0
         final_score = max(0, final_score)

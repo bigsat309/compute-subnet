@@ -208,6 +208,48 @@ class ComputeWandb:
         # Sign the run
         self.sign_run()
 
+    def update_penalized_hotkeys(self, hotkey_list):
+        """
+        This function updates the penalized hotkeys on validator side.
+        It's useless to alter this information as it needs to be signed by a valid validator hotkey.
+        """
+        # Update the configuration with the new keys
+        update_dict = {
+                "penalized_hotkeys": hotkey_list
+            }
+        self.run.config.update(update_dict, allow_val_change=True)
+
+        # Track allocated hotkeys over time
+        self.run.log({"penalized_hotkeys": self.run.config["penalized_hotkeys"]})
+
+        # Sign the run
+        self.sign_run()
+
+    def update_miner_port_open(self, is_port_open):
+        """
+        This function updates the port on miner side.
+        It's useless to alter this information as it needs to be signed by a valid miner hotkey.
+        """
+        if self.run:
+            update_dict = {
+                "is_port_open": is_port_open,
+            }
+            self.run.config.update(update_dict, allow_val_change=True)
+            
+            # Sign the run
+            self.sign_run()
+
+            bt.logging.info(f"✅ Miner's server port uploaded to Wandb.")
+        else:
+            bt.logging.warning(f"wandb init failed, update port not possible.")
+
+    def log_chain_data(self, data):
+        if self.run:
+            self.run.log(data)
+            bt.logging.info(f"✅ Logging chain data to Wandb.")
+        else:
+            bt.logging.warning(f"wandb init failed, logging not possible.")
+
     def get_allocated_hotkeys(self, valid_validator_hotkeys, flag):
         """
         This function gets all allocated hotkeys from all validators.
@@ -244,12 +286,55 @@ class ComputeWandb:
                     valid_validator_hotkey = True
 
                 if self.verify_run(run) and allocated_keys and valid_validator_hotkey:
-                            allocated_keys_list.extend(allocated_keys)  # Add the keys to the list
+                    allocated_keys_list.extend(allocated_keys)  # Add the keys to the list
 
             except Exception as e:
                 bt.logging.info(f"Run ID: {run.id}, Name: {run.name}, Error: {e}")
 
         return allocated_keys_list
+    
+    def get_penalized_hotkeys(self, valid_validator_hotkeys, flag):
+        """
+        This function gets all penalized hotkeys from all validators.
+        Only relevant for validators.
+        """
+        # Query all runs in the project and Filter runs where the role is 'validator'
+        self.api.flush()
+        validator_runs = self.api.runs(path=f"{PUBLIC_WANDB_ENTITY}/{PUBLIC_WANDB_NAME}",
+                                       filters={"$and": [{"config.role": "validator"},
+                                                         {"config.config.netuid": self.config.netuid},
+                                                         {"config.penalized_hotkeys": {"$exists": True}},]
+                                                })
+
+         # Check if the runs list is empty
+        if not validator_runs:
+            bt.logging.info("No validator info found in the project opencompute.")
+            return []
+
+        # Initialize an empty list to store allocated keys from runs with a valid signature
+        penalized_keys_list = []
+
+        # Verify the signature for each validator run
+        for run in validator_runs:
+            try:
+                # Access the run's configuration
+                run_config = run.config
+                hotkey = run_config.get('hotkey')
+                penalized_keys = run_config.get('penalized_hotkeys')
+
+                valid_validator_hotkey = hotkey in valid_validator_hotkeys
+                
+                # Allow all validator hotkeys for data retrieval only 
+                if not flag:
+                    valid_validator_hotkey = True
+
+                if self.verify_run(run) and penalized_keys and valid_validator_hotkey:
+                    penalized_keys_list.extend(penalized_keys)  # Add the keys to the list
+
+            except Exception as e:
+                bt.logging.info(f"Run ID: {run.id}, Name: {run.name}, Error: {e}")
+
+        return penalized_keys_list
     
     def get_miner_specs(self, queryable_uids):
         """
@@ -286,6 +371,35 @@ class ComputeWandb:
         
         # Return the db_specs_dict for further use or inspection
         return db_specs_dict
+    
+    def get_miner_port_open(self):
+        """
+        This function gets server port from miner.
+        Only relevant for miner.
+        """
+
+        self.api.flush()
+        runs = self.api.runs(f"{PUBLIC_WANDB_ENTITY}/{PUBLIC_WANDB_NAME}",
+                            filters={"$and": [{"config.role": "miner"},
+                                               {"config.config.netuid": self.config.netuid},
+                                               {"state": "running"}]
+                                    })
+        try:
+            # Iterate over all runs in the opencompute project
+            for index, run in enumerate(runs, start=1):
+                # Access the run's configuration
+                run_config = run.config
+                port = run_config.get('is_port_open')
+                
+                # check the signature
+                if self.verify_run(run):
+                    return port
+                        
+        except Exception as e:
+            # Handle the exception by logging an error message
+            bt.logging.error(f"An error occurred while getting miner port from wandb: {e}")
+        
+        return None
     
     def sign_run(self):
         # Include the run ID in the data to be signed

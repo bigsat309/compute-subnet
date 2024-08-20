@@ -132,3 +132,21 @@ class Challenge(bt.Synapse):
         {"password": None, "error": f"Hashcat execution failed with code {process.returncode}: {stderr}"}
         """
         return self.output
+
+class MinerPort(bt.Synapse):
+
+    output: str = ""
+
+    def deserialize(self) -> dict:
+        """
+        Returns:
+        - dict: The deserialized response, which in this case is the value of output.
+
+        Example:
+        Assuming a MinerPort instance has an output value of {}:
+        >>> miner_port_instance = MinerPort()
+        >>> miner_port_instance.output = ''
+        >>> miner_port_instance.deserialize()
+        ''
+        """
+        return self.output

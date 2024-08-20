@@ -31,6 +31,7 @@ import bittensor as bt
 import math
 import time
 
+from compute.utils.socket import check_port
 import cryptography
 import torch
 from cryptography.fernet import Fernet
@@ -50,7 +51,7 @@ from compute import (
     specs_timeout,
 )
 from compute.axon import ComputeSubnetSubtensor
-from compute.protocol import Challenge, Specs
+from compute.protocol import Challenge, MinerPort, Specs
 from compute.utils.db import ComputeDb
 from compute.utils.math import percent, force_to_float_or_default
 from compute.utils.parser import ComputeArgPaser
@@ -271,6 +272,9 @@ class Validator:
         # Fetch allocated hotkeys
         allocated_hotkeys = self.wandb.get_allocated_hotkeys(self.get_valid_validator_hotkeys(), True)
 
+        # Fetch penalized hotkeys
+        penalized_hotkeys = self.wandb.get_penalized_hotkeys(self.get_valid_validator_hotkeys(), True)
+
         # Fetch docker requirement
         has_docker_hotkeys = select_has_docker_miners_hotkey(self.db)
 
@@ -288,7 +292,7 @@ class Validator:
                 else:
                     self.stats[uid]["has_docker"] = False
 
-                score = calc_score(self.stats[uid], hotkey=hotkey, allocated_hotkeys=allocated_hotkeys)
+                score = calc_score(self.stats[uid], hotkey=hotkey, allocated_hotkeys=allocated_hotkeys, penalized_hotkeys=penalized_hotkeys)
                 self.stats[uid]["score"] = score
             except (ValueError, KeyError):
                 score = 0
@@ -507,6 +511,18 @@ class Validator:
             self.pow_responses[uid] = response
             self.new_pow_benchmark[uid] = result_data
 
+    def execute_port_checking_request(self, uid, axon: bt.AxonInfo):
+        dendrite = bt.dendrite(wallet=self.wallet)
+        bt.logging.info(f"Querying for {MinerPort.__name__} - {uid}/{axon.hotkey}")
+
+        port = dendrite.query(axon, MinerPort())
+        is_port_open = check_port(axon.ip, port)
+        penalized_hotkeys = self.wandb.get_penalized_hotkeys(self.get_valid_validator_hotkeys(), True)
+             
+        if not is_port_open and axon.hotkey not in penalized_hotkeys:
+            penalized_hotkeys.append(axon.hotkey)
+            self.wandb.update_penalized_hotkeys()
+
     def execute_specs_request(self):
         if len(self.queryable_for_specs) > 0:
             return
@@ -641,11 +657,13 @@ class Validator:
         block_next_sync_status = 1
         block_next_set_weights = self.current_block + weights_rate_limit
         block_next_hardware_info = 1
+        block_next_port_checking = 1
 
         time_next_challenge = None
         time_next_sync_status = None
         time_next_set_weights = None
         time_next_hardware_info = None
+        time_next_port_checking = None
 
         bt.logging.info("Starting validator loop.")
         while True:
@@ -661,6 +679,7 @@ class Validator:
                     time_next_hardware_info = self.next_info(
                         not block_next_hardware_info == 1 and self.validator_perform_hardware_query, block_next_hardware_info
                     )
+                    time_next_port_checking = self.next_info(not block_next_port_checking == 1, block_next_port_checking)
 
                     # Perform pow queries
                     if self.current_block % block_next_challenge == 0 or block_next_challenge < self.current_block:
@@ -725,6 +744,37 @@ class Validator:
 
                         # self.loop.run_in_executor(None, self.execute_specs_request) replaced by wandb query.
                         self.get_specs_wandb()
+
+                    # Perform port checking
+                    if self.current_block % block_next_port_checking == 0 or block_next_port_checking < self.current_block:
+                        # Next block the validators will do port checking again.
+                        block_next_port_checking = self.current_block + 50  # 50 -> every 10 minutes
+
+                        # Filter axons with stake and ip address.
+                        self._queryable_uids = self.get_queryable()
+
+                        self.threads = []
+                        for i in range(0, len(self.uids), self.validator_challenge_batch_size):
+                            for _uid in self.uids[i : i + self.validator_challenge_batch_size]:
+                                try:
+                                    self.threads.append(
+                                        threading.Thread(
+                                            target=self.execute_port_checking_request,
+                                            args=(_uid, axon, _hash, _salt, mode, chars, mask, difficulty),
+                                            name=f"th_execute_port_checking_request-{_uid}",
+                                            daemon=True,
+                                        )
+                                    )
+                                except KeyError:
+                                    continue
+
+                        for thread in self.threads:
+                            thread.start()
+
+                        for thread in self.threads:
+                            thread.join()                        
+
+                        self.sync_scores()
 
                     if self.current_block % block_next_sync_status == 0 or block_next_sync_status < self.current_block:
                         block_next_sync_status = self.current_block + 25  # ~ every 5 minutes
