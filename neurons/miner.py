@@ -207,8 +207,8 @@ class Miner:
         #      priority_fn=self.priority_specs,
         ).attach(
             forward_fn=self.miner_port,
-            blacklist_fn=self.base_blacklist,
-            priority_fn=self.base_priority
+            blacklist_fn=self.blacklist_miner_port,
+            priority_fn=self.priority_miner_port
         )
 
         # Serve passes the axon information to the network + netuid we are hosting on.
@@ -438,6 +438,15 @@ class Miner:
         )
         synapse.output = result
         return synapse
+    
+    # The blacklist function decides if a request should be ignored.
+    def blacklist_miner_port(self, synapse: Challenge) -> typing.Tuple[bool, str]:
+        return self.base_blacklist(synapse)
+
+    # The priority function determines the order in which requests are handled.
+    # More valuable or higher-priority requests are processed before others.
+    def priority_miner_port(self, synapse: Challenge) -> float:
+        return self.base_priority(synapse)
     
     # This is the Minerport function, which sends the miner's port.
     def miner_port(self, synapse: MinerPort) -> MinerPort:
