@@ -1376,7 +1376,7 @@ class RegisterAPI:
             specs_details = {}
             bt.logging.info(f"API: List resources(wandb) on compute subnet")            
             self.wandb.api.flush()
-
+            bt.logging.info(f"Test: Step1")
             # check wandb for available hotkeys
             # self.wandb.api.flush()
             running_hotkey = []
@@ -1387,21 +1387,26 @@ class RegisterAPI:
                     {"state": "running"},
                 ]
             }
+            bt.logging.info(f"Test: Step2")
             runs = await run_in_threadpool(self.wandb.api.runs,
                                            f"{PUBLIC_WANDB_ENTITY}/{PUBLIC_WANDB_NAME}", filter_rule)
+            bt.logging.info(f"Test: Step3")
             for run in runs:
                 run_config = run.config
                 run_hotkey = run_config.get("hotkey")
                 running_hotkey.append(run_hotkey)
                 specs = run_config.get("specs")
                 configs = run_config.get("config")
+                bt.logging.info(f"Test: Step4 {specs}")
                 # check the signature
                 if run_hotkey and configs:
+                    bt.logging.info(f"Test: Step5")
                     if specs:
                         specs_details[hotkey] = specs
+                        bt.logging.info(f"Test: Step6")
                     else:
                         specs_details[hotkey] = {}
-
+            bt.logging.info(f"Test: Step7")
             # Initialize a dictionary to keep track of GPU instances
             resource_list = []
             gpu_instances = {}
