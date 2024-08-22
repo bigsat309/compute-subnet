@@ -1393,12 +1393,12 @@ class RegisterAPI:
                 run_config = run.config
                 run_hotkey = run_config.get("hotkey")
                 running_hotkey.append(run_hotkey)
-                specs = run.config.get("specs")
+                specs = run_config.get("specs")
                 configs = run_config.get("config")
                 # check the signature
                 if run_hotkey and configs:
                     if specs:
-                        specs_details[hotkey] = json.loads(specs)
+                        specs_details[hotkey] = specs
                     else:
                         specs_details[hotkey] = {}
 
