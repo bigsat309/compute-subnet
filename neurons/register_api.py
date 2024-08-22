@@ -1161,6 +1161,7 @@ class RegisterAPI:
                     {"state": "running"},
                 ]
             }
+            bt.logging.info(f"Testing - SQLite:  {specs_details}")
             runs = await run_in_threadpool(self.wandb.api.runs,
                                            f"{PUBLIC_WANDB_ENTITY}/{PUBLIC_WANDB_NAME}", filter_rule)
             for run in runs:
@@ -1376,17 +1377,23 @@ class RegisterAPI:
             specs_details = {}
             bt.logging.info(f"API: List resources(wandb) on compute subnet")
             
+            bt.logging.info(f"Testing: Step 1")
             self.wandb.api.flush()
+            bt.logging.info(f"Testing: Step 2")
             filter_rule = {
                 "config.config.netuid": self.config.netuid,
                 "config.role": "miner",
                 "state": "running",
             }
+            bt.logging.info(f"Testing: Step 3 {filter_rule}")
 
             runs = await run_in_threadpool(self.wandb.api.runs,
                 f"{PUBLIC_WANDB_ENTITY}/{PUBLIC_WANDB_NAME}", filter_rule)
+            
+            bt.logging.info(f"Testing: Step 4")
 
             if runs:
+                bt.logging.info(f"Testing: Step 5")
                 # Iterate over all runs in the opencompute project
                 for index, run in enumerate(runs, start=1):
                     # Access the run's configuration
@@ -1395,10 +1402,15 @@ class RegisterAPI:
                     specs = run.config.get("specs")
                     configs = run_config.get("config")
 
+                    bt.logging.info(f"Testing: Step 6 {specs}")
+
                     # check the signature
                     if hotkey and configs:
+                        bt.logging.info(f"Testing: Step 7")
                         if specs:
+                            bt.logging.info(f"Testing: Step 8")
                             specs_details[hotkey] = json.loads(specs)
+                            bt.logging.info(f"Testing: Step 9")
                         else:
                             specs_details[hotkey] = {}
 
@@ -1412,6 +1424,7 @@ class RegisterAPI:
                     {"state": "running"},
                 ]
             }
+            bt.logging.info(f"Testing: Step 10 {specs_details}")
             runs = await run_in_threadpool(self.wandb.api.runs,
                                            f"{PUBLIC_WANDB_ENTITY}/{PUBLIC_WANDB_NAME}", filter_rule)
             for run in runs:
