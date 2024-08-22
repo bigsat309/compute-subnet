@@ -1409,7 +1409,7 @@ class RegisterAPI:
                         bt.logging.info(f"Testing: Step 7")
                         if specs:
                             bt.logging.info(f"Testing: Step 8")
-                            specs_details[hotkey] = json.loads(specs)
+                            specs_details[hotkey] = specs
                             bt.logging.info(f"Testing: Step 9")
                         else:
                             specs_details[hotkey] = {}
