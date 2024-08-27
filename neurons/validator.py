@@ -546,6 +546,8 @@ class Validator:
             timeout=60,
         )
 
+        bt.logging.info(f"Debug {Allocate.__name__} - check_allocation {check_allocation}")
+
         if check_allocation:
             is_port_open = check_port(axon.ip, check_allocation["port"])
             penalized_hotkeys_checklist = self.wandb.get_penalized_hotkeys_checklist(self.get_valid_validator_hotkeys(), True)
@@ -562,6 +564,8 @@ class Validator:
                     penalized_hotkeys_checklist.append({"hotkey": axon.hotkey, "status_code": "PORT CLOSED", "description": "The port of ssh server is closed"})
 
             self.wandb.update_penalized_hotkeys_checklist(penalized_hotkeys_checklist)
+
+            bt.logging.info(f"Debug {Allocate.__name__} - penalized_hotkeys_checklist {penalized_hotkeys_checklist}")
             
 
     def execute_specs_request(self):
@@ -791,7 +795,7 @@ class Validator:
                     # Perform miner checking
                     if self.current_block % block_next_miner_checking == 0 or block_next_miner_checking < self.current_block:
                         # Next block the validators will do port checking again.
-                        block_next_miner_checking = self.current_block + 1  # 50 -> every 10 minutes
+                        block_next_miner_checking = self.current_block + 10  # 50 -> every 10 minutes
 
                         # Filter axons with stake and ip address.
                         self._queryable_uids = self.get_queryable()
