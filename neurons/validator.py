@@ -536,21 +536,12 @@ class Validator:
     def execute_miner_checking_request(self, uid, axon: bt.AxonInfo):
         dendrite = bt.dendrite(wallet=self.wallet)
         bt.logging.info(f"Querying for {Allocate.__name__} - {uid}/{axon.hotkey}")
-        device_requirement = {"cpu": {"count": 1}, "gpu": {}, "hard_disk": {"capacity": 1073741824}, "ram": {"capacity": 1073741824}}
-        device_requirement["gpu"] = {"count": 1, "capacity": 0, "type": ""}
-        timeline = 30
 
-        bt.logging.info(f"Debug {Allocate.__name__} - uid {uid} axon {axon}")
-
-        check_allocation = dendrite.query(
-            axon,
-            Allocate(timeline=timeline, device_requirement=device_requirement, checking=True),
-            timeout=60,
-        )
+        check_allocation = dendrite.query(axon, Allocate(timeline=1, checking=True), timeout=60)
 
         bt.logging.info(f"Debug {Allocate.__name__} - check_allocation {check_allocation}")
 
-        if check_allocation:
+        if check_allocation and check_allocation["port"]:
             is_port_open = check_port(axon.ip, check_allocation["port"])
             penalized_hotkeys_checklist = self.wandb.get_penalized_hotkeys_checklist(self.get_valid_validator_hotkeys(), True)
             checklist_hotkeys = [item['hotkey'] for item in penalized_hotkeys_checklist]
