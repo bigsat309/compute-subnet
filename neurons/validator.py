@@ -540,6 +540,8 @@ class Validator:
         device_requirement["gpu"] = {"count": 1, "capacity": 0, "type": ""}
         timeline = 30
 
+        bt.logging.info(f"Debug {Allocate.__name__} - uid {uid} axon {axon}")
+
         check_allocation = dendrite.query(
             axon,
             Allocate(timeline=timeline, device_requirement=device_requirement, checking=True),
