@@ -538,12 +538,13 @@ class Validator:
         dendrite = bt.dendrite(wallet=self.wallet)
         bt.logging.info(f"Querying for {Allocate.__name__} - {uid}/{axon.hotkey}")
 
-        check_allocation = dendrite.query(axon, Allocate(timeline=1, checking=True), timeout=30)
+        response = dendrite.query(axon, Allocate(timeline=1, checking=True), timeout=30)
+        port = response.get("port", "")
 
-        bt.logging.info(f"Debug {Allocate.__name__} - check_allocation - {uid} {check_allocation}")
+        bt.logging.info(f"Debug {Allocate.__name__} - check_allocation - {uid} {response}")
 
-        if check_allocation and check_allocation["port"]:
-            is_port_open = check_port(axon.ip, check_allocation["port"])
+        if port:
+            is_port_open = check_port(axon.ip, port)
             penalized_hotkeys_checklist = self.wandb.get_penalized_hotkeys_checklist(self.get_valid_validator_hotkeys(), True)
             checklist_hotkeys = [item['hotkey'] for item in penalized_hotkeys_checklist]
 
