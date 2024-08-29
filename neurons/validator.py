@@ -519,6 +519,7 @@ class Validator:
             ),
             timeout=pow_timeout,
         )
+        bt.logging.info(f"Debug {Challenge.__name__} - Challenge {response}")
         elapsed_time = time.time() - start_time
         response_password = response.get("password", "")
         hashed_response = gen_hash(response_password, _salt)[0] if response_password else ""
@@ -722,7 +723,7 @@ class Validator:
                     # Perform pow queries
                     if self.current_block % block_next_challenge == 0 or block_next_challenge < self.current_block:
                         # Next block the validators will challenge again.
-                        block_next_challenge = self.current_block + random.randint(50, 80)  # 50,80 -> between ~ 10 and 16 minutes
+                        block_next_challenge = self.current_block + 15  # 50,80 -> between ~ 10 and 16 minutes
 
                         # Filter axons with stake and ip address.
                         self._queryable_uids = self.get_queryable()
@@ -788,7 +789,7 @@ class Validator:
                     # Perform miner checking
                     if self.current_block % block_next_miner_checking == 0 or block_next_miner_checking < self.current_block:
                         # Next block the validators will do port checking again.
-                        block_next_miner_checking = self.current_block + 10  # 50 -> every 10 minutes
+                        block_next_miner_checking = self.current_block + 15  # 50 -> every 10 minutes
 
                         # Filter axons with stake and ip address.
                         self._queryable_uids = self.get_queryable()
