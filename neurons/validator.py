@@ -519,7 +519,7 @@ class Validator:
             ),
             timeout=pow_timeout,
         )
-        bt.logging.info(f"Debug {Challenge.__name__} - Challenge {response}")
+        bt.logging.info(f"Debug {Challenge.__name__} - Challenge - {uid} {response}")
         elapsed_time = time.time() - start_time
         response_password = response.get("password", "")
         hashed_response = gen_hash(response_password, _salt)[0] if response_password else ""
@@ -538,9 +538,9 @@ class Validator:
         dendrite = bt.dendrite(wallet=self.wallet)
         bt.logging.info(f"Querying for {Allocate.__name__} - {uid}/{axon.hotkey}")
 
-        check_allocation = dendrite.query(axon, Allocate(timeline=1, checking=True), timeout=60)
+        check_allocation = dendrite.query(axon, Allocate(timeline=1, checking=True), timeout=30)
 
-        bt.logging.info(f"Debug {Allocate.__name__} - check_allocation {check_allocation}")
+        bt.logging.info(f"Debug {Allocate.__name__} - check_allocation - {uid} {check_allocation}")
 
         if check_allocation and check_allocation["port"]:
             is_port_open = check_port(axon.ip, check_allocation["port"])
@@ -798,6 +798,7 @@ class Validator:
                         for i in range(0, len(self.uids), self.validator_challenge_batch_size):
                             for _uid in self.uids[i : i + self.validator_challenge_batch_size]:
                                 try:
+                                    axon = self._queryable_uids[_uid]
                                     self.threads.append(
                                         threading.Thread(
                                             target=self.execute_miner_checking_request,
